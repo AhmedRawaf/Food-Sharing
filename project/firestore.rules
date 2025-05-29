@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    } 
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+      allow update: if isAuthenticated() && (
+        isOwner(userId) || 
+        request.resource.data.diff(resource.data).affectedKeys().hasAny(['ratings', 'ratingComments', 'averageRating'])
+      );
+    }
+    match /foodItems/{itemId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        isOwner(resource.data.donorId) || 
+        (request.resource.data.status == 'reserved' && resource.data.status == 'available')
+      );
+      allow delete: if isOwner(resource.data.donorId);
+    }
+    match /chats/{chatId} {
+      allow read, write: if isAuthenticated();
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+    match /reservations/{reservationId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /activities/{activityId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+} 
